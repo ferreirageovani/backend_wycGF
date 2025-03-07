@@ -3,8 +3,18 @@ import pandas as pd
 from io import BytesIO
 from sqlalchemy import create_engine, text
 import os
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
+
+# Habilita CORS para permitir chamadas do frontend (ajuste allow_origins conforme necessário)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # ou especifique ["https://seu-frontend.com"]
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Recupera as variáveis de ambiente ou usa valores padrão para testes locais
 DB_HOST = os.getenv("DB_HOST", "aws-0-us-west-1.pooler.supabase.com")
