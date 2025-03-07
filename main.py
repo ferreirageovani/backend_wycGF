@@ -6,12 +6,12 @@ import os
 
 app = FastAPI()
 
-# Credenciais do Supabase (Pooler)
-DB_HOST = "aws-0-us-west-1.pooler.supabase.com"
-DB_PORT = "6543"
-DB_NAME = "postgres"
-DB_USER = "postgres.komoeffgbltdarjwnrnc"
-DB_PASSWORD = "@wycGF4565"  # Substitua pela sua senha real
+# Recupera as variáveis de ambiente ou usa valores padrão para testes locais
+DB_HOST = os.getenv("DB_HOST", "aws-0-us-west-1.pooler.supabase.com")
+DB_PORT = os.getenv("DB_PORT", "6543")
+DB_NAME = os.getenv("DB_NAME", "postgres")
+DB_USER = os.getenv("DB_USER", "postgres.komoeffgbltdarjwnrnc")
+DB_PASSWORD = os.getenv("DB_PASSWORD", "@wycGF4565")
 
 # Codifica a senha para a URL (substituindo "@" por "%40")
 safe_password = DB_PASSWORD.replace("@", "%40")
@@ -39,23 +39,26 @@ async def upload_excel(file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro ao ler o arquivo: {e}")
     
-    # Define as colunas esperadas (eles devem corresponder exatamente ao nome das colunas do arquivo Excel)
-    expected_columns = {
-        "Nome da Origem", "Número ConLicitação", "Código", "Órgão", "Endereço", "Cidade",
+    # Define as colunas obrigatórias (removendo "Nome da Origem" para que ela seja opcional)
+    required_columns = {
+        "Número ConLicitação", "Código", "Órgão", "Endereço", "Cidade",
         "Estado", "CEP", "Edital", "Site 1", "Site 2", "Processo", "Valor Estimado",
         "Itens", "Situação", "Documento", "Abertura", "Prazo", "Objeto", "Observação",
         "Anexos", "Atualizada em"
     }
     
-    if not expected_columns.issubset(df.columns):
+    if not required_columns.issubset(df.columns):
         raise HTTPException(
             status_code=400,
-            detail=f"Colunas esperadas não encontradas no arquivo. Colunas lidas: {df.columns.tolist()}"
+            detail=f"Colunas obrigatórias não encontradas no arquivo. Colunas lidas: {df.columns.tolist()}"
         )
     
     try:
         with engine.begin() as connection:
             for idx, row in df.iterrows():
+                # Se "Nome da Origem" não existir, usa um valor padrão.
+                nome_origem_val = convert_to_text(row.get("Nome da Origem")) if "Nome da Origem" in df.columns else "Não informado"
+                
                 query = text("""
                     INSERT INTO db_acompanhamentos (
                         "Nome da Origem", "Número ConLicitação", "Código", "Órgão", "Endereço",
@@ -71,7 +74,7 @@ async def upload_excel(file: UploadFile = File(...)):
                     )
                 """)
                 connection.execute(query, {
-                    "nome_origem": convert_to_text(row.get("Nome da Origem")),
+                    "nome_origem": nome_origem_val,
                     "numero_conlicitacao": convert_to_text(row.get("Número ConLicitação")),
                     "codigo": convert_to_text(row.get("Código")),
                     "orgao": convert_to_text(row.get("Órgão")),
